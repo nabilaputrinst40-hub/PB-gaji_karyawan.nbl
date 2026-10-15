@@ -1,0 +1,357 @@
+/* =========================================================
+   DAFTAR GAJI KARYAWAN
+   Ubah aturan gaji di bagian ATURAN di bawah ini.
+   ========================================================= */
+
+/* ---------- ATURAN ---------- */
+// Pendidikan dari yang terendah sampai tertinggi
+const PENDIDIKAN = [
+  "Belum Sekolah", "Paket A (setara SD)", "SD", "Paket B (setara SMP)", "SMP",
+  "Paket C (setara SMA)", "SMA/SMK", "D3", "S1", "S2", "S3"
+];
+
+// Gaji pokok berdasarkan lama bekerja (urut dari yang terbesar)
+const TARIF = [
+  { min: 16, max: 32, gaji: 6000000 },
+  { min: 11, max: 15, gaji: 4500000 },
+  { min: 5,  max: 10, gaji: 3000000 },
+  { min: 1,  max: 4,  gaji: 2000000 }   // 1-4 tahun (asumsi, silakan ubah)
+];
+const gajiPokok = t => (TARIF.find(r => t >= r.min) || TARIF[TARIF.length - 1]).gaji;
+const tunjanganTetap = t => (t >= 15 ? 300000 : 150000);  // per bulan
+const tunjanganAnak  = (anak, pokok) => (anak >= 3 ? pokok * 0.07 : 0);
+const premi = pokok => pokok * 0.03;
+const pph   = pokok => pokok * 0.03;
+
+function hitung(k) {
+  const pokok = gajiPokok(k.lama);
+  const tTetap = tunjanganTetap(k.lama);
+  const tAnak = tunjanganAnak(k.anak, pokok);
+  const pr = premi(pokok);
+  const p = pph(pokok);
+  return { pokok, tTetap, tAnak, pr, p, bersih: pokok + tTetap + tAnak + pr + p };
+}
+
+/* ---------- DATA (mulai kosong, diisi sendiri) ---------- */
+const KEY = "dgk_data_v2";
+let data = JSON.parse(localStorage.getItem(KEY) || "[]");
+let editId = null, deleteId = null;
+const save = () => localStorage.setItem(KEY, JSON.stringify(data));
+const rp = n => "Rp " + Math.round(n).toLocaleString("id-ID");
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+/* ---------- LOGIN / DAFTAR / LOGOUT ---------- */
+const USERS_KEY = "gajiku_users";
+const getUsers = () => JSON.parse(localStorage.getItem(USERS_KEY) || "{}");
+
+// Password disimpan dalam bentuk hash, bukan teks asli
+async function hashPass(text) {
+  try {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+  } catch (e) {
+    return btoa(unescape(encodeURIComponent(text))); // cadangan jika crypto tidak tersedia
+  }
+}
+
+let mode = "login";
+function setMode(m) {
+  mode = m;
+  const reg = m === "register";
+  $("tabLogin").classList.toggle("active", !reg);
+  $("tabRegister").classList.toggle("active", reg);
+  $("authTitle").textContent = reg ? "Buat akun baru" : "Masuk ke akun";
+  $("authDesc").textContent = reg
+    ? "Pilih username dan password sendiri."
+    : "Masukkan username dan password Anda.";
+  $("confirmWrap").hidden = !reg;
+  $("btnLogin").textContent = reg ? "Daftar sekarang" : "Masuk";
+  $("password").autocomplete = reg ? "new-password" : "current-password";
+  $("loginError").hidden = true;
+}
+$("tabLogin").onclick = () => setMode("login");
+$("tabRegister").onclick = () => setMode("register");
+
+function authError(msg) {
+  $("loginError").textContent = msg;
+  $("loginError").hidden = false;
+}
+
+function showApp() {
+  const name = sessionStorage.getItem("gajiku_login") || "Admin";
+  $("userName").textContent = name;
+  $("avatar").textContent = name.charAt(0).toUpperCase();
+  $("welcome").textContent = "Selamat datang, " + name;
+  $("loginPage").hidden = true;
+  $("app").hidden = false;
+  goPage("dashboard");
+  renderAll();
+}
+
+async function submitAuth() {
+  const u = $("username").value.trim();
+  const p = $("password").value;
+  const users = getUsers();
+  const key = u.toLowerCase();
+
+  if (!u || !p) return authError("Username dan password wajib diisi.");
+
+  if (mode === "register") {
+    if (u.length < 3) return authError("Username minimal 3 karakter.");
+    if (/\s/.test(u)) return authError("Username tidak boleh pakai spasi.");
+    if (p.length < 4) return authError("Password minimal 4 karakter.");
+    if (p !== $("password2").value) return authError("Password dan ulangi password tidak sama.");
+    if (users[key]) return authError("Username sudah dipakai. Pilih username lain.");
+    users[key] = { nama: u, hash: await hashPass(p) };
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    toast("Akun berhasil dibuat");
+  } else {
+    if (!users[key] || users[key].hash !== await hashPass(p)) {
+      return authError("Username atau password salah. Coba lagi.");
+    }
+  }
+
+  sessionStorage.setItem("gajiku_login", users[key].nama);
+  $("loginError").hidden = true;
+  showApp();
+}
+
+$("btnLogin").onclick = submitAuth;
+["username", "password", "password2"].forEach(id =>
+  $(id).addEventListener("keydown", e => e.key === "Enter" && submitAuth())
+);
+$("togglePass").onclick = () => {
+  const show = $("password").type === "password";
+  $("password").type = show ? "text" : "password";
+  $("togglePass").textContent = show ? "Sembunyi" : "Lihat";
+};
+$("btnLogout").onclick = () => {
+  sessionStorage.removeItem("gajiku_login");
+  $("app").hidden = true;
+  $("loginPage").hidden = false;
+  $("password").value = "";
+  $("password2").value = "";
+  setMode(Object.keys(getUsers()).length ? "login" : "register");
+};
+
+// Kalau belum ada akun sama sekali, langsung tampilkan form Daftar
+setMode(Object.keys(getUsers()).length ? "login" : "register");
+
+/* ---------- NAVIGASI ---------- */
+function goPage(page) {
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.toggle("active", b.dataset.page === page));
+  $("page-dashboard").hidden = page !== "dashboard";
+  $("page-karyawan").hidden = page !== "karyawan";
+  $("pageTitle").textContent = page === "dashboard" ? "Dashboard" : "Data Gaji Karyawan";
+}
+document.querySelectorAll(".nav-btn").forEach(b => b.onclick = () => goPage(b.dataset.page));
+$("goAdd").onclick = () => { goPage("karyawan"); openForm(); };
+$("pageDate").textContent = new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+/* ---------- RENDER ---------- */
+function renderAll() { renderTable(); renderDashboard(); }
+
+function renderTable() {
+  const q = $("search").value.trim().toLowerCase();
+  const list = data.filter(k => k.nama.toLowerCase().includes(q));
+  $("tbody").innerHTML = list.map((k, i) => {
+    const h = hitung(k);
+    return `<tr>
+      <td>${i + 1}</td>
+      <td class="name">${esc(k.nama)}</td>
+      <td><span class="badge">${esc(k.pendidikan)}</span></td>
+      <td>${k.lama} tahun</td>
+      <td>${k.anak}</td>
+      <td>${rp(h.pokok)}</td>
+      <td>${rp(h.tTetap)}</td>
+      <td>${rp(h.tAnak)}</td>
+      <td>${rp(h.pr)}</td>
+      <td>${rp(h.p)}</td>
+      <td class="net">${rp(h.bersih)}</td>
+      <td><div class="act">
+        <button class="btn-edit" onclick="openForm(${k.id})">Edit</button>
+        <button class="btn-del" onclick="askDelete(${k.id})">Hapus</button>
+      </div></td></tr>`;
+  }).join("");
+  $("empty").hidden = list.length > 0;
+  $("empty").textContent = data.length
+    ? "Tidak ada nama yang cocok dengan pencarian Anda."
+    : 'Belum ada karyawan. Klik "+ Tambah karyawan" untuk mulai mengisi data.';
+}
+
+function renderDashboard() {
+  const total = data.length;
+  const sum = data.reduce((a, k) => a + hitung(k).bersih, 0);
+  $("stTotal").textContent = total;
+  $("stGaji").textContent = rp(sum);
+  $("stRata").textContent = rp(total ? sum / total : 0);
+  $("stAnak").textContent = data.filter(k => k.anak >= 3).length;
+}
+$("tarifList").innerHTML = [...TARIF].reverse()
+  .map(r => `<li><span>${r.min}-${r.max} tahun</span><b>${rp(r.gaji)}</b></li>`).join("");
+$("search").addEventListener("input", renderTable);
+
+/* ---------- FORM TAMBAH / EDIT ---------- */
+$("fPendidikan").innerHTML = PENDIDIKAN.map(p => `<option>${p}</option>`).join("");
+
+function updatePreview() {
+  const lama = parseInt($("fLama").value);
+  if (isNaN(lama) || lama < 1 || lama > 32) {
+    $("pvPokok").textContent = "-";
+    $("pvBersih").textContent = "-";
+    return;
+  }
+  const h = hitung({ lama, anak: parseInt($("fAnak").value) || 0 });
+  $("pvPokok").textContent = rp(h.pokok);
+  $("pvBersih").textContent = rp(h.bersih);
+}
+["fLama", "fAnak"].forEach(id => $(id).addEventListener("input", updatePreview));
+
+function openForm(id = null) {
+  editId = id;
+  const k = data.find(x => x.id === id);
+  $("modalTitle").textContent = k ? "Edit karyawan" : "Tambah karyawan";
+  $("fNama").value = k ? k.nama : "";
+  $("fPendidikan").value = k ? k.pendidikan : PENDIDIKAN[0];
+  $("fLama").value = k ? k.lama : "";
+  $("fAnak").value = k ? k.anak : 0;
+  $("formError").hidden = true;
+  updatePreview();
+  $("modal").hidden = false;
+  $("fNama").focus();
+}
+const closeForm = () => $("modal").hidden = true;
+$("btnAdd").onclick = () => openForm();
+$("btnCancel").onclick = closeForm;
+
+$("btnSave").onclick = () => {
+  const nama = $("fNama").value.trim();
+  const lama = parseInt($("fLama").value);
+  const anak = parseInt($("fAnak").value);
+  if (!nama) return showErr("Nama karyawan wajib diisi.");
+  if (isNaN(lama) || lama < 1 || lama > 32) return showErr("Lama bekerja harus diisi angka 1 sampai 32 tahun.");
+  if (isNaN(anak) || anak < 0) return showErr("Jumlah anak harus 0 atau lebih.");
+  const rec = { nama, pendidikan: $("fPendidikan").value, lama, anak };
+  if (editId) {
+    data = data.map(k => k.id === editId ? { ...k, ...rec } : k);
+    toast("Data berhasil diperbarui");
+  } else {
+    data.push({ id: Date.now(), ...rec });
+    toast("Karyawan berhasil ditambahkan");
+  }
+  save(); closeForm(); renderAll();
+};
+function showErr(msg) { $("formError").textContent = msg; $("formError").hidden = false; }
+
+/* ---------- HAPUS ---------- */
+function askDelete(id) {
+  deleteId = id;
+  const k = data.find(x => x.id === id);
+  $("confirmText").textContent = `Data "${k.nama}" akan dihapus permanen.`;
+  $("confirm").hidden = false;
+}
+$("btnNo").onclick = () => $("confirm").hidden = true;
+$("btnYes").onclick = () => {
+  data = data.filter(k => k.id !== deleteId);
+  save(); $("confirm").hidden = true; renderAll();
+  toast("Data karyawan dihapus");
+};
+
+/* ---------- CETAK & EXPORT EXCEL ---------- */
+// Yang dicetak/diexport sesuai isi pencarian saat ini (kosongkan pencarian untuk semua data)
+const dataTampil = () => {
+  const q = $("search").value.trim().toLowerCase();
+  return data.filter(k => k.nama.toLowerCase().includes(q));
+};
+const tanggalHariIni = () =>
+  new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+
+/* --- Cetak --- */
+$("btnPrint").onclick = () => {
+  const list = dataTampil();
+  if (!list.length) return toast("Belum ada data untuk dicetak");
+
+  let total = 0;
+  const rows = list.map((k, i) => {
+    const h = hitung(k);
+    total += h.bersih;
+    return `<tr>
+      <td>${i + 1}</td><td>${esc(k.nama)}</td><td>${esc(k.pendidikan)}</td>
+      <td>${k.lama} th</td><td>${k.anak}</td>
+      <td class="num">${rp(h.pokok)}</td><td class="num">${rp(h.tTetap)}</td>
+      <td class="num">${rp(h.tAnak)}</td><td class="num">${rp(h.pr)}</td>
+      <td class="num">${rp(h.p)}</td><td class="num"><b>${rp(h.bersih)}</b></td></tr>`;
+  }).join("");
+
+  $("printArea").innerHTML = `
+    <h1>DAFTAR GAJI KARYAWAN</h1>
+    <p class="sub">Dicetak pada ${tanggalHariIni()}</p>
+    <table>
+      <thead><tr>
+        <th>No</th><th>Nama</th><th>Pendidikan</th><th>Lama</th><th>Anak</th>
+        <th>Gaji pokok</th><th>Tunjangan</th><th>Tunj. anak</th><th>Premi 3%</th><th>PPh 3%</th><th>Gaji bersih</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr><td colspan="10">TOTAL GAJI BERSIH (${list.length} karyawan)</td>
+        <td class="num">${rp(total)}</td></tr></tfoot>
+    </table>
+    <div class="ttd">Mengetahui,<div></div>( ........................... )</div>`;
+  window.print();
+};
+
+/* --- Export Excel (.xlsx) --- */
+$("btnExcel").onclick = () => {
+  if (typeof XLSX === "undefined") return toast("Export Excel butuh koneksi internet");
+  const list = dataTampil();
+  if (!list.length) return toast("Belum ada data untuk diexport");
+
+  const head = ["No", "Nama", "Pendidikan", "Lama Bekerja (tahun)", "Jumlah Anak",
+    "Gaji Pokok", "Tunjangan", "Tunjangan Anak", "Premi 3%", "PPh 3%", "Gaji Bersih"];
+  const total = [0, 0, 0, 0, 0, 0]; // pokok, tunjangan, t.anak, premi, pph, bersih
+  const rows = list.map((k, i) => {
+    const h = hitung(k);
+    const v = [h.pokok, h.tTetap, h.tAnak, h.pr, h.p, h.bersih].map(Math.round);
+    v.forEach((n, j) => total[j] += n);
+    return [i + 1, k.nama, k.pendidikan, k.lama, k.anak, ...v];
+  });
+
+  const aoa = [
+    ["DAFTAR GAJI KARYAWAN"],
+    ["Dicetak pada " + tanggalHariIni()],
+    [],
+    head,
+    ...rows,
+    ["", "TOTAL", "", "", "", ...total]
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"] = [{ wch: 5 }, { wch: 26 }, { wch: 22 }, { wch: 20 }, { wch: 13 },
+    { wch: 15 }, { wch: 15 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 16 }];
+  ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 10 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 10 } }];
+
+  // Format angka ribuan untuk kolom gaji
+  for (let r = 4; r < aoa.length; r++) {
+    for (let c = 5; c <= 10; c++) {
+      const cell = ws[XLSX.utils.encode_cell({ r, c })];
+      if (cell) cell.z = "#,##0";
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Daftar Gaji");
+  XLSX.writeFile(wb, "Daftar-Gaji-Karyawan.xlsx");
+  toast("File Excel berhasil dibuat");
+};
+
+/* ---------- UTIL ---------- */
+let toastTimer;
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.hidden = true, 2400);
+}
+document.addEventListener("keydown", e => { if (e.key === "Escape") { closeForm(); $("confirm").hidden = true; } });
+
+/* Tetap login saat halaman direfresh */
+if (sessionStorage.getItem("gajiku_login")) showApp();

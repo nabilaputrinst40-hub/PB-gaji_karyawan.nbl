@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DAFTAR GAJI KARYAWAN</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============ HALAMAN LOGIN ============ -->
+<section id="loginPage" class="login">
+  <div class="login-brand">
+    <div class="logo">D</div>
+    <h1>DAFTAR GAJI KARYAWAN</h1>
+    <p>Kelola gaji, tunjangan, dan data karyawan dalam satu tempat yang rapi dan mudah.</p>
+    <ul>
+      <li>Hitung gaji bersih otomatis</li>
+      <li>Cari dan ubah data dalam hitungan detik</li>
+      <li>Cetak laporan dan export ke Excel</li>
+    </ul>
+  </div>
+  <div class="login-form-wrap">
+    <div class="login-card">
+      <div class="tabs">
+        <button type="button" id="tabLogin" class="tab active">Masuk</button>
+        <button type="button" id="tabRegister" class="tab">Daftar</button>
+      </div>
+      <h2 id="authTitle">Masuk ke akun</h2>
+      <p class="muted" id="authDesc">Masukkan username dan password Anda.</p>
+
+      <label for="username">Username</label>
+      <input id="username" type="text" placeholder="Contoh: budi123" autocomplete="username">
+
+      <label for="password">Password</label>
+      <div class="pass-wrap">
+        <input id="password" type="password" placeholder="Masukkan password" autocomplete="current-password">
+        <button type="button" id="togglePass" class="ghost small">Lihat</button>
+      </div>
+
+      <div id="confirmWrap" hidden>
+        <label for="password2">Ulangi password</label>
+        <input id="password2" type="password" placeholder="Ketik ulang password" autocomplete="new-password">
+      </div>
+
+      <p id="loginError" class="error" hidden></p>
+      <button id="btnLogin" class="primary full">Masuk</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ APLIKASI ============ -->
+<div id="app" class="app" hidden>
+  <aside class="sidebar">
+    <div class="side-logo"><div class="logo sm">D</div><span>DAFTAR GAJI KARYAWAN</span></div>
+    <nav>
+      <button class="nav-btn active" data-page="dashboard">Dashboard</button>
+      <button class="nav-btn" data-page="karyawan">Data Gaji Karyawan</button>
+    </nav>
+    <button id="btnLogout" class="logout">Keluar</button>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h2 id="pageTitle">Dashboard</h2>
+        <p class="muted" id="pageDate"></p>
+      </div>
+      <div class="user"><span class="avatar" id="avatar">A</span> <span id="userName">Admin</span></div>
+    </header>
+
+    <!-- DASHBOARD -->
+    <section id="page-dashboard" class="page">
+      <div class="hero">
+        <div>
+          <h3 id="welcome">Selamat datang</h3>
+          <p>Pantau ringkasan penggajian di sini. Mulai dengan menambahkan karyawan, lalu gaji bersih dihitung otomatis.</p>
+        </div>
+        <button id="goAdd" class="white">+ Tambah karyawan</button>
+      </div>
+
+      <div class="stats">
+        <div class="stat red1"><span>Total karyawan</span><b id="stTotal">0</b></div>
+        <div class="stat"><span>Total gaji bersih / bulan</span><b id="stGaji">Rp 0</b></div>
+        <div class="stat red2"><span>Rata-rata gaji bersih</span><b id="stRata">Rp 0</b></div>
+        <div class="stat"><span>Karyawan 3+ anak</span><b id="stAnak">0</b></div>
+      </div>
+
+      <div class="card">
+        <h3>Ketentuan penggajian</h3>
+        <div class="rules">
+          <div>
+            <h4>Gaji pokok berdasarkan lama bekerja</h4>
+            <ul id="tarifList"></ul>
+          </div>
+          <div>
+            <h4>Tunjangan dan potongan</h4>
+            <ul>
+              <li><span>Tunjangan 15 tahun ke atas</span><b>Rp 300.000</b></li>
+              <li><span>Tunjangan di bawah 15 tahun</span><b>Rp 150.000</b></li>
+              <li><span>Tunjangan anak (3 anak ke atas)</span><b>7% gaji pokok</b></li>
+              <li><span>Premi</span><b>3% gaji pokok</b></li>
+              <li><span>PPh</span><b>3% gaji pokok</b></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TABEL -->
+    <section id="page-karyawan" class="page" hidden>
+      <div class="card">
+        <div class="toolbar">
+          <input id="search" type="search" placeholder="Cari nama karyawan...">
+          <div class="tool-btns">
+            <button id="btnPrint" class="ghost">Cetak</button>
+            <button id="btnExcel" class="ghost">Export Excel</button>
+            <button id="btnAdd" class="primary">+ Tambah karyawan</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>No</th><th>Nama</th><th>Pendidikan</th><th>Lama bekerja</th><th>Anak</th>
+                <th>Gaji pokok</th><th>Tunjangan</th><th>Tunj. anak</th><th>Premi 3%</th><th>PPh 3%</th>
+                <th>Gaji bersih</th><th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+        <p id="empty" class="empty" hidden></p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ============ MODAL FORM ============ -->
+<div id="modal" class="overlay" hidden>
+  <div class="modal">
+    <h3 id="modalTitle">Tambah karyawan</h3>
+
+    <label for="fNama">Nama karyawan</label>
+    <input id="fNama" type="text" placeholder="Nama lengkap">
+
+    <label for="fPendidikan">Pendidikan</label>
+    <select id="fPendidikan"></select>
+
+    <div class="row">
+      <div>
+        <label for="fLama">Lama bekerja (tahun)</label>
+        <input id="fLama" type="number" min="1" max="32" inputmode="numeric" placeholder="1 sampai 32">
+      </div>
+      <div>
+        <label for="fAnak">Jumlah anak</label>
+        <input id="fAnak" type="number" min="0" max="20" value="0" inputmode="numeric">
+      </div>
+    </div>
+
+    <div class="preview">
+      <div><span>Gaji pokok</span><b id="pvPokok">-</b></div>
+      <div><span>Gaji bersih</span><b id="pvBersih">-</b></div>
+    </div>
+    <p id="formError" class="error" hidden></p>
+    <div class="actions">
+      <button id="btnCancel" class="ghost">Batal</button>
+      <button id="btnSave" class="primary">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL HAPUS ============ -->
+<div id="confirm" class="overlay" hidden>
+  <div class="modal small-modal">
+    <h3>Hapus data karyawan?</h3>
+    <p id="confirmText" class="muted"></p>
+    <div class="actions">
+      <button id="btnNo" class="ghost">Batal</button>
+      <button id="btnYes" class="danger">Hapus</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<div id="printArea"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
